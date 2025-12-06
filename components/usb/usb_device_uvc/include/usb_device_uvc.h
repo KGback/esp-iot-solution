@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <sys/time.h>
 #include "esp_err.h"
-
+#include "freertos/queue.h" // gukai@20251124
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -85,7 +85,8 @@ esp_err_t uvc_device_config(int index, uvc_device_config_t *config);
  * @return ESP_OK on success
  *         ESP_FAIL if the UVC device could not be initialized
  */
-esp_err_t uvc_device_init(void);
+esp_err_t uvc_device_init(const QueueHandle_t frame_o);  //gukai@20251124
+// esp_err_t uvc_device_init(void);
 
 /**
  * @brief Deinitialize the UVC device

@@ -45,6 +45,7 @@ typedef struct {
 } fb_t;
 
 static fb_t s_fb;
+static QueueHandle_t xQueueAIFrame = NULL;
 
 static esp_err_t camera_init(uint32_t xclk_freq_hz, pixformat_t pixel_format, framesize_t frame_size, int jpeg_quality, uint8_t fb_count)
 {
@@ -233,6 +234,7 @@ static void camera_fb_return_cb(uvc_fb_t *fb, void *cb_ctx)
 
 void app_main(void)
 {
+    xQueueAIFrame = xQueueCreate(2, sizeof(uvc_fb_t *));
     // if using esp-s3-eye board, show the GUI
 #if CONFIG_CAMERA_MODULE_ESP_S3_EYE
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
@@ -272,7 +274,7 @@ void app_main(void)
 #endif
 
     ESP_ERROR_CHECK(uvc_device_config(0, &config));
-    ESP_ERROR_CHECK(uvc_device_init());
+    ESP_ERROR_CHECK(uvc_device_init(xQueueAIFrame));
 
     while (1) {
 #if CONFIG_CAMERA_MODULE_ESP_S3_EYE

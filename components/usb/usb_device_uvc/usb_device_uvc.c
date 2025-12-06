@@ -36,6 +36,9 @@ typedef struct {
 
 static uvc_device_t s_uvc_device;
 
+// gukai@20251124
+static QueueHandle_t xQueueFrameO = NULL;
+
 static void usb_phy_init(void)
 {
     // Configure USB PHY
@@ -155,6 +158,12 @@ static void video_task(void *arg)
         }
         frame_len = pic->len;
         memcpy(uvc_buffer, pic->buf, frame_len);
+
+        if (uvc_buffer)  // gukai@20251124
+        {
+            xQueueSend(xQueueFrameO, &pic->buf, portMAX_DELAY);  
+        }
+
         s_uvc_device.user_config[0].fb_return_cb(pic, s_uvc_device.user_config[0].cb_ctx);
         tx_busy = 1;
         tud_video_n_frame_xfer(0, 0, (void *)uvc_buffer, frame_len);
@@ -275,8 +284,9 @@ esp_err_t uvc_device_config(int index, uvc_device_config_t *config)
     s_uvc_device.uvc_init[index] = true;
     return ESP_OK;
 }
-
-esp_err_t uvc_device_init(void)
+// gukai@20251124
+esp_err_t uvc_device_init(const QueueHandle_t frame_o)
+// esp_err_t uvc_device_init(void)
 {
     ESP_RETURN_ON_FALSE(s_uvc_device.uvc_init[0], ESP_ERR_INVALID_STATE, TAG, "uvc device 0 not init");
 #if CONFIG_UVC_SUPPORT_TWO_CAM
@@ -300,12 +310,13 @@ esp_err_t uvc_device_init(void)
         ESP_LOGE(TAG, "USB Device Stack Init Fail");
         return ESP_FAIL;
     }
-
+    // gukai@20251124
+    xQueueFrameO = frame_o;
     BaseType_t core_id = (CONFIG_UVC_TINYUSB_TASK_CORE < 0) ? tskNO_AFFINITY : CONFIG_UVC_TINYUSB_TASK_CORE;
-    xTaskCreatePinnedToCore(tusb_device_task, "TinyUSB", 4096, NULL, CONFIG_UVC_TINYUSB_TASK_PRIORITY, NULL, core_id);
+    xTaskCreatePinnedToCore(tusb_device_task, "TinyUSB", 4096, NULL, CONFIG_UVC_TINYUSB_TASK_PRIORITY, NULL, 1);
 #if (CFG_TUD_VIDEO)
     core_id = (CONFIG_UVC_CAM1_TASK_CORE < 0) ? tskNO_AFFINITY : CONFIG_UVC_CAM1_TASK_CORE;
-    xTaskCreatePinnedToCore(video_task, "UVC", 4096, NULL, CONFIG_UVC_CAM1_TASK_PRIORITY, &s_uvc_device.uvc_task_hdl[0], core_id);
+    xTaskCreatePinnedToCore(video_task, "UVC", 4096, NULL, CONFIG_UVC_CAM1_TASK_PRIORITY, &s_uvc_device.uvc_task_hdl[0], 1);
 #if CONFIG_UVC_SUPPORT_TWO_CAM
     core_id = (CONFIG_UVC_CAM2_TASK_CORE < 0) ? tskNO_AFFINITY : CONFIG_UVC_CAM2_TASK_CORE;
     xTaskCreatePinnedToCore(video_task2, "UVC2", 4096, NULL, CONFIG_UVC_CAM2_TASK_PRIORITY, &s_uvc_device.uvc_task_hdl[1], core_id);
