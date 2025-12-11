@@ -172,7 +172,10 @@ static esp_err_t camera_start_cb(uvc_format_t format, int width, int height, int
         return ESP_ERR_NOT_SUPPORTED;
     }
 
-    if (width == 320 && height == 240) {
+    if (width == 240 && height == 240) {
+        frame_size = FRAMESIZE_240X240;
+        jpeg_quality = 10;
+    } else if(width == 320 && height == 240) {
         frame_size = FRAMESIZE_QVGA;
         jpeg_quality = 10;
     } else if (width == 480 && height == 320) {
@@ -195,17 +198,12 @@ static esp_err_t camera_start_cb(uvc_format_t format, int width, int height, int
         return ESP_ERR_NOT_SUPPORTED;
     }
 
-    esp_err_t ret = camera_init(CAMERA_XCLK_FREQ, PIXFORMAT_JPEG, frame_size, jpeg_quality, CAMERA_FB_COUNT);
+    esp_err_t ret = camera_init(CAMERA_XCLK_FREQ, PIXFORMAT_JPEG, FRAMESIZE_240X240, jpeg_quality, CAMERA_FB_COUNT);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "camera init failed");
         return ret;
     }
 
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
-#if CONFIG_CAMERA_MODULE_ESP_S3_EYE
-    // xEventGroupSetBits(s_event_group, EYES_OPEN_BIT);
-#endif
-#endif
     return ESP_OK;
 }
 
@@ -274,12 +272,15 @@ extern "C" void app_main()
     ESP_LOGI(TAG, "\tFrame(3) = %d * %d @%dfps", UVC_FRAMES_INFO[0][3].width, UVC_FRAMES_INFO[0][3].height, UVC_FRAMES_INFO[0][3].rate);
 #endif
 
+    // esp_err_t ret = camera_init(CAMERA_XCLK_FREQ, PIXFORMAT_RGB565, FRAMESIZE_240X240, 10, CAMERA_FB_COUNT);
+
     ESP_ERROR_CHECK(uvc_device_config(0, &config));
     ESP_ERROR_CHECK(uvc_device_init(xQueueAIFrame));
     // register_camera(PIXFORMAT_RGB565, FRAMESIZE_240X240, 2, xQueueAIFrame);
 
-    // register_algo_yolo(xQueueAIFrame, NULL, NULL, xQueueLCDFrame, false);
-    register_lcd(xQueueAIFrame, NULL, true);
+    register_algo_yolo(xQueueAIFrame, NULL, NULL, xQueueLCDFrame, false);
+    // register_algo_yolo(xQueueAIFrame, NULL, NULL, NULL, false);
+    // register_lcd(xQueueLCDFrame, NULL, true);
     while (1)
     {
         vTaskDelay(pdMS_TO_TICKS(100));

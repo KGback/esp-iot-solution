@@ -15,6 +15,10 @@ dependencies:
     rules:
       - if: "${USB_WEBCAM_BOARD} in [esp32_s3_eye]"
     override_path: "../eyes_show"
+  esp_jpeg:
+    rules:
+      - if: "${USB_WEBCAM_BOARD} in [esp32_s3_eye]"
+    override_path: "../esp_jpeg"
   esp-nn:
     rules:
       - if: "${USB_WEBCAM_BOARD} in [esp32_s3_eye]"

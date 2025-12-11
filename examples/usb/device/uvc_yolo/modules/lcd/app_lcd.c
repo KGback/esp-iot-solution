@@ -39,13 +39,17 @@ static void task_process_handler(void *arg)
 
 esp_err_t register_lcd(const QueueHandle_t frame_i, const QueueHandle_t frame_o, const bool return_fb)
 {
+    ESP_LOGD(TAG, "Begin register_lcd" );  // gukai@20251211
     spi_config_t bus_conf = {
         .miso_io_num = BOARD_LCD_MISO,
         .mosi_io_num = BOARD_LCD_MOSI,
         .sclk_io_num = BOARD_LCD_SCK,
         .max_transfer_sz = 2 * BOARD_LCD_H_RES * BOARD_LCD_V_RES + 10,
     };
+    ESP_LOGD(TAG, "Before spi_bus_create" );
     spi_bus_handle_t spi_bus = spi_bus_create(LCD_HOST, &bus_conf);
+
+    ESP_LOGD(TAG, "After spi_bus_create" );
 
     scr_interface_spi_config_t spi_lcd_cfg = {
         .spi_bus = spi_bus,
@@ -92,7 +96,6 @@ esp_err_t register_lcd(const QueueHandle_t frame_i, const QueueHandle_t frame_o,
 
     app_lcd_set_color(0x000000);
     vTaskDelay(pdMS_TO_TICKS(200));
-    // app_lcd_set_color(0xFFFF);
 
     xQueueFrameI = frame_i;
     xQueueFrameO = frame_o;

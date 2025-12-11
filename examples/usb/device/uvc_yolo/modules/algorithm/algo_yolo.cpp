@@ -31,7 +31,7 @@ static QueueHandle_t xQueueResult = NULL;
 
 static bool gEvent = true;
 static bool gReturnFB = true;
-static bool debug_mode = false;
+static bool debug_mode = true; // gukai@20251124
 
 #define CONFIDENCE 25
 #define IOU 45
@@ -83,6 +83,15 @@ static void task_process_handler(void *arg)
                 int dsp_start_time = esp_timer_get_time() / 1000;
                 _yolo_list.clear();
 
+                if (debug_mode) // gukai@20251124
+                {
+                    printf("Before\n");
+                    printf("Frame Format: {\"height\": %d, \"width\": %d}\r\n", frame->height, frame->width);
+                    printf("Format: {\"height\": %d, \"width\": %d, \"channels\": %d, \"model\": \"yolo\"}\r\n", h, w, c);
+                    // base64_encode(input->data.uint8, input->bytes, putchar);
+                    printf("\r\n");
+                }
+
                 if (c == 1)
                     rgb565_to_gray(input->data.uint8, frame->buf, frame->height, frame->width, h, w, ROTATION_UP);
                 else if (c == 3)
@@ -100,7 +109,7 @@ static void task_process_handler(void *arg)
                     printf("Begin output\n");
                     printf("Format: {\"height\": %d, \"width\": %d, \"channels\": %d, \"model\": \"yolo\"}\r\n", h, w, c);
                     printf("Framebuffer: ");
-                    base64_encode(input->data.uint8, input->bytes, putchar);
+                    // base64_encode(input->data.uint8, input->bytes, putchar);
                     printf("\r\n");
                 }
 
@@ -194,7 +203,7 @@ static void task_process_handler(void *arg)
 
             if (xQueueFrameO)
             {
-                xQueueSend(xQueueFrameO, &frame, portMAX_DELAY);
+                // xQueueSend(xQueueFrameO, &frame, portMAX_DELAY);  // gukai@20251124
             }
             else if (gReturnFB)
             {
@@ -290,7 +299,7 @@ int register_algo_yolo(const QueueHandle_t frame_i,
     // Get information about the memory area to use for the model's input.
     input = interpreter->input(0);
 
-    xTaskCreatePinnedToCore(task_process_handler, TAG, 4 * 1024, NULL, 5, NULL, 0);
+    xTaskCreatePinnedToCore(task_process_handler, TAG, 4 * 1024, NULL, 5, NULL, 0); // gukai@20251124
     if (xQueueEvent)
         xTaskCreatePinnedToCore(task_event_handler, TAG, 4 * 1024, NULL, 5, NULL, 1);
 
