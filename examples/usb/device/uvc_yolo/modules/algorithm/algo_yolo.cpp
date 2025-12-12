@@ -22,6 +22,9 @@
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/schema/schema_generated.h"
 
+#include "usb_device_uvc.h"
+#include "jpeg_decoder.h"
+
 static const char *TAG = "yolo";
 
 static QueueHandle_t xQueueFrameI = NULL;
@@ -32,6 +35,8 @@ static QueueHandle_t xQueueResult = NULL;
 static bool gEvent = true;
 static bool gReturnFB = true;
 static bool debug_mode = true; // gukai@20251124
+uint8_t *file_buffer = NULL; /*!< decode image buffer */
+size_t file_buffer_size = 0; /*!< decode image buffer size */
 
 #define CONFIDENCE 25
 #define IOU 45
@@ -67,7 +72,8 @@ namespace
 
 static void task_process_handler(void *arg)
 {
-    camera_fb_t *frame = NULL;
+    uvc_fb_t *uvc_frame = NULL;
+    camera_fb_t frame ;
 
     uint16_t h = input->dims->data[1];
     uint16_t w = input->dims->data[2];
@@ -77,30 +83,64 @@ static void task_process_handler(void *arg)
     {
         if (gEvent)
         {
-            if (xQueueReceive(xQueueFrameI, &frame, portMAX_DELAY))
+            ESP_LOGI(TAG, " Yolo Task");
+            printf("Yolo Task waiting for frame...\r\n");
+            if (xQueueReceive(xQueueFrameI, &uvc_frame, portMAX_DELAY))
             {
-
+                ESP_LOGI(TAG, " After xQueueReceive");
                 int dsp_start_time = esp_timer_get_time() / 1000;
                 _yolo_list.clear();
 
-                if (debug_mode) // gukai@20251124
+                // gukai@20251211
                 {
-                    printf("Before\n");
-                    printf("Frame Format: {\"height\": %d, \"width\": %d}\r\n", frame->height, frame->width);
-                    printf("Format: {\"height\": %d, \"width\": %d, \"channels\": %d, \"model\": \"yolo\"}\r\n", h, w, c);
-                    // base64_encode(input->data.uint8, input->bytes, putchar);
-                    printf("\r\n");
+                    ESP_LOGI(TAG, " Before jpeg_cfg, height: %d, width: %d, len: %d", uvc_frame->height , uvc_frame->width,uvc_frame->len);
+                    file_buffer_size = 240 * 240 * sizeof(uint16_t);
+                    file_buffer = (uint8_t *)malloc(file_buffer_size); 
+                    esp_jpeg_image_cfg_t jpeg_cfg = {
+                        .indata =  (uint8_t *)uvc_frame->buf,
+                        .indata_size = uvc_frame->len,
+                        .outbuf =  file_buffer,
+                        .outbuf_size = file_buffer_size,
+                        .out_format = JPEG_IMAGE_FORMAT_RGB565,
+                        .out_scale = JPEG_IMAGE_SCALE_0,
+                        .flags = {
+                            .swap_color_bytes = 1,
+                        },
+                    };
+                    esp_jpeg_image_output_t outimage;
+                    ESP_LOGI(TAG, " Before esp_jpeg_decode");
+                    esp_jpeg_decode(&jpeg_cfg, &outimage);
+                    ESP_LOGI(TAG, " size: %d x %d, len: %d", outimage.width, outimage.height, outimage.output_len);
+                    
+                    memset(&frame, 0, sizeof(frame));
+                    frame.buf = file_buffer;
+                    frame.width = outimage.width;
+                    frame.height = outimage.height;
+                    frame.len = outimage.output_len;
+                    frame.format = PIXFORMAT_RGB565;
+                    
+
+                    if (debug_mode) // gukai@20251124
+                    {
+                        printf("Before\n");
+                        printf("Frame Format: {\"height\": %d, \"width\": %d}\r\n", frame.height, frame.width);
+                        printf("Format: {\"height\": %d, \"width\": %d, \"channels\": %d, \"model\": \"yolo\"}\r\n", h, w, c);
+                        // base64_encode(input->data.uint8, input->bytes, putchar);
+                        printf("\r\n");
+                    }
                 }
 
                 if (c == 1)
-                    rgb565_to_gray(input->data.uint8, frame->buf, frame->height, frame->width, h, w, ROTATION_UP);
+                    rgb565_to_gray(input->data.uint8, frame.buf, frame.height, frame.width, h, w, ROTATION_UP);
                 else if (c == 3)
-                    rgb565_to_rgb888(input->data.uint8, frame->buf, frame->height, frame->width, h, w, ROTATION_UP);
+                    rgb565_to_rgb888(input->data.uint8, frame.buf, frame.height, frame.width, h, w, ROTATION_UP);
 
                 // for (int i = 0; i < input->bytes; i++)
                 // {
-                //     frame->buf[i] = input->data.uint8[i];
+                //     frame.buf[i] = input->data.uint8[i];
                 // }
+                // gukai@20251211
+                free(file_buffer);
 
                 int dsp_end_time = esp_timer_get_time() / 1000;
 
@@ -160,10 +200,10 @@ static void task_process_handler(void *arg)
                     target = j;
                 }
             }
-            int x = int(float(float(output->data.int8[i * num_element + OBJECT_X_INDEX] - zero_point) * scale) * frame->width);
-            int y = int(float(float(output->data.int8[i * num_element + OBJECT_Y_INDEX] - zero_point) * scale) * frame->height);
-            int w = int(float(float(output->data.int8[i * num_element + OBJECT_W_INDEX] - zero_point) * scale) * frame->width);
-            int h = int(float(float(output->data.int8[i * num_element + OBJECT_H_INDEX] - zero_point) * scale) * frame->height);
+            int x = int(float(float(output->data.int8[i * num_element + OBJECT_X_INDEX] - zero_point) * scale) * frame.width);
+            int y = int(float(float(output->data.int8[i * num_element + OBJECT_Y_INDEX] - zero_point) * scale) * frame.height);
+            int w = int(float(float(output->data.int8[i * num_element + OBJECT_W_INDEX] - zero_point) * scale) * frame.width);
+            int h = int(float(float(output->data.int8[i * num_element + OBJECT_H_INDEX] - zero_point) * scale) * frame.height);
 
             printf("index: %d target: %d max: %d confidence: %d box{x: %d, y: %d, w: %d, h: %d}\n", i, target, max, int((float)confidence * 100), x, y, w, h);
         }
@@ -179,11 +219,11 @@ static void task_process_handler(void *arg)
                     printf("    [\n");
                     for (auto &yolo : _yolo_list)
                     {
-                        yolo.x = uint16_t(float(yolo.x) / float(w) * float(frame->width));
-                        yolo.y = uint16_t(float(yolo.y) / float(h) * float(frame->height));
-                        yolo.w = uint16_t(float(yolo.w) / float(w) * float(frame->width));
-                        yolo.h = uint16_t(float(yolo.h) / float(h) * float(frame->height));
-                        fb_gfx_drawRect2(frame, yolo.x - yolo.w / 2, yolo.y - yolo.h / 2, yolo.w, yolo.h, box_color[index % (sizeof(box_color) / sizeof(box_color[0]))], 4);
+                        yolo.x = uint16_t(float(yolo.x) / float(w) * float(frame.width));
+                        yolo.y = uint16_t(float(yolo.y) / float(h) * float(frame.height));
+                        yolo.w = uint16_t(float(yolo.w) / float(w) * float(frame.width));
+                        yolo.h = uint16_t(float(yolo.h) / float(h) * float(frame.height));
+                        fb_gfx_drawRect2(&frame, yolo.x - yolo.w / 2, yolo.y - yolo.h / 2, yolo.w, yolo.h, box_color[index % (sizeof(box_color) / sizeof(box_color[0]))], 4);
                         // fb_gfx_printf(frame, yolo.x - yolo.w / 2, yolo.y - yolo.h/2 - 5, 0x1FE0, 0x0000, "%s", g_yolo_model_classes[yolo.target]);
                         printf("        {\"class\": \"%d\", \"x\": %d, \"y\": %d, \"w\": %d, \"h\": %d, \"confidence\": %d},\n", yolo.target, yolo.x, yolo.y, yolo.w, yolo.h, yolo.confidence);
                         index++;
@@ -207,11 +247,11 @@ static void task_process_handler(void *arg)
             }
             else if (gReturnFB)
             {
-                esp_camera_fb_return(frame);
+                esp_camera_fb_return(&frame);
             }
             else
             {
-                free(frame);
+                // free(frame);
             }
 
             if (xQueueResult)

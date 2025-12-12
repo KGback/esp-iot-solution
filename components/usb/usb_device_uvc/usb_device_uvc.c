@@ -17,8 +17,6 @@
 #include "tusb.h"
 #include "usb_device_uvc.h"
 
-#include "jpeg_decoder.h"
-
 static const char *TAG = "usbd_uvc";
 
 #if CONFIG_UVC_SUPPORT_TWO_CAM
@@ -40,8 +38,6 @@ static uvc_device_t s_uvc_device;
 
 // gukai@20251124
 static QueueHandle_t xQueueFrameO = NULL;
-uint8_t *file_buffer = NULL; /*!< decode image buffer */
-size_t file_buffer_size = 0; /*!< decode image buffer size */
 
 static void usb_phy_init(void)
 {
@@ -163,34 +159,14 @@ static void video_task(void *arg)
         frame_len = pic->len;
         memcpy(uvc_buffer, pic->buf, frame_len);
 
-        if (pic->buf)  // gukai@20251124
+        if (pic)  // gukai@20251124
         {
-            file_buffer_size = 240 * 240 * sizeof(uint16_t);
-            file_buffer = heap_caps_calloc(file_buffer_size, 1, MALLOC_CAP_DEFAULT); 
-            esp_jpeg_image_cfg_t jpeg_cfg = {
-                .indata = (uint8_t *)pic->buf,
-                .indata_size = pic->len,
-                .outbuf = file_buffer,
-                .outbuf_size = file_buffer_size,
-                .out_format = JPEG_IMAGE_FORMAT_RGB565,
-                .out_scale = JPEG_IMAGE_SCALE_0,
-                .flags = {
-                    .swap_color_bytes = 1,
-                },
-            };
-            esp_jpeg_image_output_t outimage;
-            esp_jpeg_decode(&jpeg_cfg, &outimage);
-            ESP_LOGI(TAG, " size: %d x %d", outimage.width, outimage.height);
-
-            uvc_fb_t *yolo_frame = malloc(sizeof(uvc_fb_t));
-            yolo_frame->buf = file_buffer;
-            yolo_frame->width = outimage.width;
-            yolo_frame->height = outimage.height;
-            yolo_frame->len = pic->len;
-            yolo_frame->format = 0;// PIXFORMAT_RGB565;
-            xQueueSend(xQueueFrameO, &yolo_frame, portMAX_DELAY);  
-            free(yolo_frame);
-            heap_caps_free(file_buffer);
+            if ((frame_num%10 == 0))
+            {
+                ESP_LOGD(TAG, "Before xQueueSend");
+                xQueueSend(xQueueFrameO, &pic, portMAX_DELAY);  
+                ESP_LOGD(TAG, "After xQueueSend");
+            }
         }
 
         s_uvc_device.user_config[0].fb_return_cb(pic, s_uvc_device.user_config[0].cb_ctx);

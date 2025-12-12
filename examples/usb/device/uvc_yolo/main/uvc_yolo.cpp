@@ -244,8 +244,7 @@ extern "C" void app_main()
     // if using esp-s3-eye board, show the GUI
     ESP_LOGI(TAG, "Selected Camera Board %s", CAMERA_MODULE_NAME);
  
-    xQueueAIFrame = xQueueCreate(2, sizeof(uvc_fb_t *));
-    xQueueLCDFrame = xQueueCreate(2, sizeof(uvc_fb_t *));
+    xQueueAIFrame = xQueueCreate(16, sizeof(uvc_fb_t *));
 
     uint8_t *uvc_buffer = (uint8_t *)malloc(UVC_MAX_FRAMESIZE_SIZE);
     if (uvc_buffer == NULL) {
@@ -272,7 +271,10 @@ extern "C" void app_main()
     ESP_LOGI(TAG, "\tFrame(3) = %d * %d @%dfps", UVC_FRAMES_INFO[0][3].width, UVC_FRAMES_INFO[0][3].height, UVC_FRAMES_INFO[0][3].rate);
 #endif
 
-    // esp_err_t ret = camera_init(CAMERA_XCLK_FREQ, PIXFORMAT_RGB565, FRAMESIZE_240X240, 10, CAMERA_FB_COUNT);
+    if (xQueueAIFrame == NULL) {
+        ESP_LOGE(TAG, "xQueueAIFrame creation failed!");
+        // 这里可以选择重新尝试、降低内存占用或者进入错误处理
+    }
 
     ESP_ERROR_CHECK(uvc_device_config(0, &config));
     ESP_ERROR_CHECK(uvc_device_init(xQueueAIFrame));

@@ -12,7 +12,8 @@ set(include_dirs
                     imu
                     model
                     algorithm
-                    utils)
+                    utils
+                    ../../../../../components/usb/usb_device_uvc/include)
 
 set(requires    esp32-camera
                 bus
@@ -20,6 +21,7 @@ set(requires    esp32-camera
                 fb_gfx
                 tflite-lib
                 esp_timer
+                esp_jpeg
                 )
 
 idf_component_register(SRC_DIRS ${src_dirs} INCLUDE_DIRS ${include_dirs} REQUIRES ${requires})
