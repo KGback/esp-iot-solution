@@ -153,7 +153,7 @@ static void camera_stop_cb(void *cb_ctx)
     (void)cb_ctx;
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
 #if CONFIG_CAMERA_MODULE_ESP_S3_EYE
-    // xEventGroupSetBits(s_event_group, EYES_CLOSE_BIT);
+    // xEventGroupSetBits(s_event_group, EYES_CLOSE_BIT);  //guaki@20251224
 #endif
 #endif
     ESP_LOGI(TAG, "Camera Stop");
@@ -203,6 +203,8 @@ static esp_err_t camera_start_cb(uvc_format_t format, int width, int height, int
         ESP_LOGE(TAG, "camera init failed");
         return ret;
     }
+
+    // gukai@20251224: remove event group
 
     return ESP_OK;
 }
@@ -280,8 +282,8 @@ extern "C" void app_main()
     ESP_ERROR_CHECK(uvc_device_init(xQueueAIFrame));
     // register_camera(PIXFORMAT_RGB565, FRAMESIZE_240X240, 2, xQueueAIFrame);
 
-    register_algo_yolo(xQueueAIFrame, NULL, NULL, xQueueLCDFrame, false);
-    // register_algo_yolo(xQueueAIFrame, NULL, NULL, NULL, false);
+    // register_algo_yolo(xQueueAIFrame, NULL, NULL, xQueueLCDFrame, false);
+    register_algo_yolo(xQueueAIFrame, NULL, NULL, NULL, false);
     // register_lcd(xQueueLCDFrame, NULL, true);
     while (1)
     {

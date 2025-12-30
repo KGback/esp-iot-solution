@@ -3,7 +3,8 @@
 #include <forward_list>
 
 #include "algo_yolo.hpp"
-#include "yolo_model_data.h"
+// #include "yolo_model_data.h"
+#include "tongue_model_data.h"
 
 #include "fb_gfx.h"
 #include "isp.h"
@@ -283,7 +284,7 @@ int register_algo_yolo(const QueueHandle_t frame_i,
     gReturnFB = camera_fb_return;
 
     // get model (.tflite) from flash
-    model = tflite::GetModel(g_yolo_model_data);
+    model = tflite::GetModel(g_tongue_model_data);
     if (model->version() != TFLITE_SCHEMA_VERSION)
     {
         MicroPrintf("Model provided is schema version %d not equal to supported "
